@@ -295,12 +295,40 @@ set(hndl,'ButtonDownFcn', {@mainframe_callback, hndl});
 set(hndl,'ResizeFcn',{@guiresizereqestfcn, hndl});
 set(hndl,'CloseRequestFcn',{@guiclosereqestfcn, hndl});
 
-setappdata(hndl,'currpageindx', 1);  
 
 % scrolling & frame viewing parameters
 setappdata(hndl,'border', 10);         % matlab controls have a 5 pixel boundary
 
+setappdata(hndl,'currpageindx', 0);  
+setappdata(hndl,'lastpage', 0);  
+%set(hndl,'name','No file selected');
+
+
 drawnow;
+
+end
+
+
+
+function clearwindow(hndl)
+
+figure(hndl);   % to make sure focus is in main window, regardless of where called from
+
+% need to get rid of the old buttons to paint the new ones
+h_im = getappdata(hndl,'h_im');
+h_txt = getappdata(hndl,'h_txt');
+len = length(h_im);
+if (len > 0),
+    for i = len:-1:1,
+        delete(h_im(i));
+        h_im(i) = [];
+        delete(h_txt(i));
+        h_txt(i) = [];
+    end;
+end;
+
+set(hndl,'name','No file selected');
+
 
 end
 
@@ -477,10 +505,14 @@ if (isappdata(hndl,'file')),
         end % switch
     
     else    % there are no more files in filelist
+        % zero out all the images in the screen: call to paint page zero
+        setappdata(hndl,'currpageindx',0);  % page zero
+        clearwindow(hndl);
+        drawnow;
+
         clear_currentsession(hndl);
         rmappdata(hndl,'filelist');    % now there is no active filelist
-        % some way to zero out all the images in the screen?
-    
+        
     end;
     
     
@@ -529,6 +561,7 @@ setappdata(hndl,'fileindx', 1);    % index of active file in filelist
 setappdata(hndl,'file', tmpval{1});
 clear tmpval;
 
+setappdata(hndl,'currpageindx', 1);  
 
 % retrieve the relevant data from ROI, ADC, HDR, & ATR files
 importIFCBdata(hndl);
@@ -572,6 +605,7 @@ function clear_currentsession(hndl)
     setappdata(hndl,'h_txt',[]);
     setappdata(hndl,'selectedimages',[]);
     setappdata(hndl,'page',[]);
+    setappdata(hndl,'lastpage',0);
     setappdata(hndl,'tiff_outdir',[]);
     setappdata(hndl,'images_to_display',0);
 
@@ -1794,22 +1828,23 @@ function updateroiframes(hndl)
 
 % get current figure focus
 currfocus = gcf;
+
 figure(hndl);   % to make sure focus is in main window, regardless of where called from
-
-
-
-% need to get rid of the old buttons to paint the new ones
+ 
 h_im = getappdata(hndl,'h_im');
 h_txt = getappdata(hndl,'h_txt');
-len = length(h_im);
-if (len > 0),
-    for i = len:-1:1,
-        delete(h_im(i));
-        h_im(i) = [];
-        delete(h_txt(i));
-        h_txt(i) = [];
-    end;
-end;
+% % need to get rid of the old buttons to paint the new ones
+% len = length(h_im);
+% if (len > 0),
+%     for i = len:-1:1,
+%         delete(h_im(i));
+%         h_im(i) = [];
+%         delete(h_txt(i));
+%         h_txt(i) = [];
+%     end;
+% end;
+clearwindow(hndl);
+
 
 
 % find all the rois on the page to display
