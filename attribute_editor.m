@@ -1,4 +1,4 @@
-function attribute_editor (infilename)
+function attribute_editor
 % gui to edit attribute file for a given IFCB8 file
 % SRL Sept 2015
 %   - heavily revised to take new approach to handling function calls
@@ -15,15 +15,7 @@ close all force;
 h_main = figure; 
 set(h_main,'visible','off');    % make it initially invisible
 
-setappdata(h_main,'filelist',[]);
-setappdata(h_main,'h_im',[]); % these need to be defined before use
-setappdata(h_main,'h_txt',[]);
-setappdata(h_main,'selectedimages',[]);
-setappdata(h_main,'page',[]);
-setappdata(h_main,'tiff_outdir',[]);
-
 setappdata(h_main,'selectallxfer',0); % a hack to help with the select all: shift-mouse won't work..
-
 
 
 % these are for the autosave feature to save atr files every 5 min
@@ -32,7 +24,7 @@ setappdata(h_main,'selectallxfer',0); % a hack to help with the select all: shif
 % timer default is single-shot. needs to be reset each time in callback
 
 %remove all existing timers like this one
-timers = timerfind('UserData','atr_timer');
+timers = timerfind('Name','atr_timer');
 if ~isempty(timers),
     for i = 1:length(timers),
         fprintf('Deleting timer instance %d\n',i);
@@ -44,7 +36,10 @@ end;
 setappdata(h_main,'atrfileautosaveperiod',2);     % minutes
 setappdata(h_main,'atrfilesavetimer',timer('TimerFcn', {@atr_timer_update, h_main},... 
                  'StartDelay',getappdata(h_main,'atrfileautosaveperiod') * 60, ...
-                 'UserData','atr_timer') ); % needs to be in seconds
+                 'Period',getappdata(h_main,'atrfileautosaveperiod') * 60, ...                 
+                 'ExecutionMode','FixedRate',...
+                 'Name','atr_timer') ); % needs to be in seconds
+fprintf('Autosave timer init with period %d min\n',getappdata(h_main,'atrfileautosaveperiod'));
 
 setappdata(h_main,'imageproctoolboxinstalled',license('test','image_toolbox') );
 % this code needs grayslice (contained within) and imwrite to output TIFFs (not included)
@@ -110,42 +105,8 @@ createWindow(h_main);
 set(h_main,'visible','on');    % make it initially invisible
 
 
-
-% get the input file if not passed already to function as input parameters
-if (~isappdata(h_main,'infilename'))
-    
-    [files, path] = uigetfile('*.roi','Multiselect','on');
-    setappdata(h_main,'filelist',files);
-    setappdata(h_main,'path',path);
-    clear files path;
-
-    % figure out if single or multiple file selected
-    if ~iscell(getappdata(h_main,'filelist') ),
-        setappdata(h_main,'filelist', { getappdata(h_main,'filelist') } );
-    end;
-    
-    if isequal(getappdata(h_main,'filelist'),0) || isequal(getappdata(h_main,'path'),0),
-        fprintf('File selection input cancelled\n');
-        return;
-    end;
-    setappdata(h_main,'filelist', sort(getappdata(h_main,'filelist') ));    % sort them in order
-    tmpval = getappdata(h_main,'filelist');
-    setappdata(h_main,'file', tmpval{1});
-
-else
-    
-    tmpval = fileparts(infilename);
-    setappdata(h_main,'path',tmpval(1));
-    setappdata(h_main,'file',fullfile(tmpval(2), tmpval(3)));
-    setappdata(h_main,'filelist', getappdata(h_main,'file') );
-
-%    [SETTINGS.path, SETTINGS.file, ext] = fileparts(infilename);
-%    SETTINGS.file = [SETTINGS.file ext];
-%    SETTINGS.filelist = SETTINGS.file;
-end;
-
-load_currentsession([],h_main);    % launch the editing window with file-specific data
-
+% now the window is set up and ready to receive instructions
+fprintf('Program initialized\n');
 
 end
 
@@ -272,83 +233,6 @@ end
 
 
 
-%*******************************
-% LOAD CURRENT SESSION
-%*******************************
-
-function load_currentsession(inparam, hndl)
-
-
-
-% if called after running at least once, move on to the next file in filelist
-if strcmp(inparam,'nextfile'),   
-    % change to next file in SETTINGS.filelist
-    % first find location of the current filename, in the filelist
-    filelist = getappdata(hndl,'filelist');
-    for i = 1:length(filelist)
-        if (strcmp(getappdata(hndl,'file'), filelist{i}))
-            break;  % then i is the current index
-        end;
-    end;
-
-    
-    % reset anything that needs to be FOR THE GUI, when starting a new file
-    % resetting of SETTING variables used for IFCB data, done in importIFCBdata
-    setappdata(hndl,'selectedimages', []);
-    setappdata(hndl,'page', []);
-    setappdata(hndl,'tiff_outdir', []);
-    setappdata(hndl,'currpageindx', 1);  
-    
-    
-    
-    % if next file is last file in filelist, close
-    if (i + 1 > length(getappdata(hndl,'filelist')) ), % if the next location is off the list
-        fclose all;
-        closereq;
-        return;
-    else
-        tmval = getappdata(hndl,'filelist');
-        setappdata(hndl,'file', tmval{i+1});
-    end;
-
-end;
-
-
-
-
-% retrieve the relevant data from ROI, ADC, HDR, & ATR files
-importIFCBdata(hndl);
-
-generate_roitable(hndl);  % given the filtering, determine which rois are to be displayed (e.g. all?)
-
-updateroiframes(hndl);
-
-drawnow;
-
-
-% a temporary hack for the dialog box "display only" sense of the display fields in morpho and species
-%eval('for i = 1:length(SETTINGS.attrib.species.name), SETTINGS.attrib.species.display(i) = false; end; ');
-%eval('for i = 1:length(SETTINGS.attrib.morpho.name), SETTINGS.attrib.morpho.display(i) = false; end; ');
-attrib = getappdata(hndl,'attrib');
-eval('for i = 1:length(attrib.species.name), attrib.species.display(i) = false; end; ');
-eval('for i = 1:length(attrib.morpho.name), attrib.morpho.display(i) = false; end; ');
-setappdata(hndl,'attrib',attrib);
-
-
-% if there isn't a modal options dialog already open, open one
-if ~isappdata(hndl,'h_optsdlg'), 
-    options_dialog([],[],hndl);
-end;
-
-
-
-
-
-end
-
-
-
-
 
 
 
@@ -426,22 +310,24 @@ end
 function build_menu(hndl)
 
 setappdata(hndl,'mha',uimenu(gcf,'Label','File') );
-setappdata(hndl,'eha1', uimenu(getappdata(hndl,'mha'),'Label','Open datafile','Callback',@opendatafile) );
-setappdata(hndl,'eha2', uimenu(getappdata(hndl,'mha'),'Label','Save attributes to file','Callback',@write_atr_file) );
-setappdata(hndl,'eha3', uimenu(getappdata(hndl,'mha'),'Label','Exit','Callback',{@guiclosereqestfcn, hndl}) );
+setappdata(hndl,'eha1', uimenu(getappdata(hndl,'mha'),'Label','Open new ROI file','Callback',{@opendatafile, hndl}) );
+setappdata(hndl,'eha2', uimenu(getappdata(hndl,'mha'),'Label','Update ATR file','Callback',{@write_atr_file, hndl}) );
+setappdata(hndl,'eha3', uimenu(getappdata(hndl,'mha'),'Label','Close current ROI file','Callback',{@closedatafile, hndl}) );
+setappdata(hndl,'eha4', uimenu(getappdata(hndl,'mha'),'Label','Exit','Callback',{@guiclosereqestfcn, hndl}) );
 
 setappdata(hndl,'mhb', uimenu(gcf,'Label','View') );
 setappdata(hndl,'ehb1', uimenu(getappdata(hndl,'mhb'),'Label','Refresh','Callback',@menu_refresh) );
 setappdata(hndl,'ehb2', uimenu(getappdata(hndl,'mhb'),'Label','Options Dialog','Callback',{@options_dialog, hndl}) );
 
 setappdata(hndl,'mhc', uimenu(gcf,'Label','*.atr Operations','Callback',{@menu_editatrfile, hndl}) );
+set(getappdata(hndl,'mhc'),'Enable','off' );
 %SETTINGS.ehc1 = uimenu(SETTINGS.mhc,'Label','Refresh','Callback',{@menu_refresh, hndl});
 
 setappdata(hndl,'mhd', uimenu(gcf,'Label','Export images','Callback',{@menu_export_images, hndl}) );
 %SETTINGS.ehd1 = uimenu(SETTINGS.mhc,'Label','Refresh','Callback',{@menu_refresh, hndl});
 % menu_export_images depends on image toolbox imwrite for TIFF output
 if (getappdata(hndl,'imageproctoolboxinstalled') == 0),
-    set(setappdata(hndl,'mhd','Enable','off') );
+    set(getappdata(hndl,'mhd'),'Enable','off' );
 end;
 
 setappdata(hndl,'mhe',uimenu(gcf,'Label','Select All','Callback',{@image_select_all, hndl}) );
@@ -464,13 +350,247 @@ end
 function menu_editatrfile(src,evnt, hndl)
 
 % save current file, open it for editing, then reload when done
-write_atr_file;
+fprintf('editing ATR file\n');
+write_atr_file([],[],hndl);
 edit(getappdata(hndl,'atrname'));
 
 end
 
 function menu_debug(src,evnt,hndl)
 keyboard;
+end
+
+
+
+
+
+
+
+
+
+
+function opendatafile(src,evnt, hndl)
+
+
+% ideally obviate this by disabling menu item
+if (isappdata(hndl,'file'))
+    % open file already
+	errorHandler('Already an open file\n', 'File selection issue');
+    return;
+    
+elseif (~isappdata(hndl,'filelist'))    % or no filelist selected yet
+    
+    [files, path] = uigetfile('*.roi','Multiselect','off');
+    setappdata(hndl,'filelist',files);
+    setappdata(hndl,'path',path);
+    clear files path;
+
+    % figure out if single or multiple file selected
+    if ~iscell(getappdata(hndl,'filelist') ),
+        setappdata(hndl,'filelist', { getappdata(hndl,'filelist') } );
+    end;
+    
+    if isequal(getappdata(hndl,'filelist'),0) || isequal(getappdata(hndl,'path'),0),
+        errorHandler('File selection input cancelled\n', 'File selection issue');
+        return;
+    end;
+    setappdata(hndl,'filelist', sort(getappdata(hndl,'filelist') ));    % sort them in order
+%    tmpval = getappdata(hndl,'filelist');
+%    setappdata(hndl,'file', tmpval{1});
+    setappdata(hndl,'fileindx', 1);    % index of active file in filelist
+    
+elseif ( isappdata(hndl,'filelist') && getappdata(hndl,'fileindx') < length(getappdata(hndl,'filelist')) )    % this is reached when prior multiselected files exist
+    % there should be at least one more file in list: load that info and open it
+
+%	tmpval = getappdata(hndl,'filelist');
+%    setappdata(hndl,'file', tmpval{ getappdata(hndl,'fileindx') + 1 });
+    setappdata(hndl,'fileindx', getappdata(hndl,'fileindx')+1);    % index of active file in filelist
+
+elseif ( getappdata(hndl,'fileindx') == length(getappdata(hndl,'filelist')) )    % this is reached when prior multiselected files exist
+	errorHandler('No additional files in file list or other issue\n', 'File selection issue');
+    return;
+   
+   
+else
+    % either no more files to load in filelist
+	errorHandler('File selection input problem\n', 'File selection issue');
+    return;
+end;
+
+
+% check for valid path/file name and continue
+if isequal(getappdata(hndl,'filelist'),0) || isequal(getappdata(hndl,'path'),0),
+    errorHandler('Bad choice of file or path\n','File choice error');
+    return;
+else
+    load_currentsession(getappdata(hndl,'fileindx'),hndl);    % launch the editing window with file-specific data
+end;
+
+
+
+% a file is open: disable and grey out the file input menu selection
+%set(getappdata(hndl,'eha1'),'Enable','off' );
+
+
+
+
+end
+
+
+
+
+
+function closedatafile(src,evnt, hndl)
+
+
+% is there an open file?
+if (isappdata(hndl,'file')),
+    
+    
+    fprintf('Closing IFCB atr file for %s\n',fullfile(getappdata(hndl,'path'), getappdata(hndl,'file')) );    
+    
+    % prompt for saving attribute file
+    ButtonName = questdlg('Save the *.atr file?', ...
+        'Save Attributes to file', ...
+        'Yes', 'No', 'Yes');
+    switch ButtonName,
+        case 'Yes',
+            write_atr_file([],[],hndl);
+    end % switch
+    
+    rmappdata(hndl,'file');    % now there is no active file
+    
+    
+    % are there more files in this filelist?
+    % be smart to make this not recursive
+    if (getappdata(hndl,'fileindx') < length(getappdata(hndl,'filelist')) )
+        
+        % prompt for opening next file
+        ButtonName = questdlg('Edit next file?', ...
+            'Next file?', ...
+            'Yes', 'No', 'No');
+        switch ButtonName,
+            case 'Yes',
+% think about this calling convention
+                load_currentsession('nextfile', hndl);
+                return;
+        end % switch
+    
+    else    % there are no more files in filelist
+        clear_currentsession(hndl);
+        rmappdata(hndl,'filelist');    % now there is no active filelist
+        % some way to zero out all the images in the screen?
+    
+    end;
+    
+    
+end;
+
+
+end
+
+
+
+
+
+
+
+
+
+
+
+%*******************************
+% LOAD CURRENT SESSION
+%*******************************
+
+function load_currentsession(indx, hndl)
+% indx here is the pointer of which file in filelist
+% if zero, a null file (create an empty window)
+
+% zero out all appdata before loading this file
+clear_currentsession(hndl);
+
+
+% set a message to ask user to be patient
+set(hndl,'name','Please wait - datafile loading');
+set(hndl,'Pointer','watch');    % set mouse to hourglass
+drawnow;
+
+
+if (indx == 0),
+    errorHandler('zero index\n' , 'error in load_currentsession');
+    return;
+end;
+
+
+% start loading up file indicated by fileindx
+tmpval = getappdata(hndl,'filelist');
+setappdata(hndl,'fileindx', 1);    % index of active file in filelist
+setappdata(hndl,'file', tmpval{1});
+clear tmpval;
+
+
+% retrieve the relevant data from ROI, ADC, HDR, & ATR files
+importIFCBdata(hndl);
+
+generate_roitable(hndl);  % given the filtering, determine which rois are to be displayed (e.g. all?)
+
+updateroiframes(hndl);
+
+set(hndl,'Pointer','arrow');    % set mouse to back to pointer
+drawnow;
+
+
+% a temporary hack for the dialog box "display only" sense of the display fields in morpho and species
+%eval('for i = 1:length(SETTINGS.attrib.species.name), SETTINGS.attrib.species.display(i) = false; end; ');
+%eval('for i = 1:length(SETTINGS.attrib.morpho.name), SETTINGS.attrib.morpho.display(i) = false; end; ');
+attrib = getappdata(hndl,'attrib');
+eval('for i = 1:length(attrib.species.name), attrib.species.display(i) = false; end; ');
+eval('for i = 1:length(attrib.morpho.name), attrib.morpho.display(i) = false; end; ');
+setappdata(hndl,'attrib',attrib);
+
+
+% if there isn't a modal options dialog already open, open one
+if ~isappdata(hndl,'h_optsdlg'), 
+    options_dialog([],[],hndl);
+end;
+
+
+
+% start the autosave timer for the atr file
+start(getappdata(hndl,'atrfilesavetimer'));
+
+
+end
+
+
+
+% reset/erase current session data
+function clear_currentsession(hndl)
+
+    setappdata(hndl,'h_im',[]); % these need to be defined before use
+    setappdata(hndl,'h_txt',[]);
+    setappdata(hndl,'selectedimages',[]);
+    setappdata(hndl,'page',[]);
+    setappdata(hndl,'tiff_outdir',[]);
+    setappdata(hndl,'images_to_display',0);
+
+    setappdata(hndl,'adcdata',[]);
+    setappdata(hndl,'num_imgs',[]);
+    setappdata(hndl,'imgnum',[]);
+    setappdata(hndl,'trigger',[]);
+    setappdata(hndl,'xsize',[]);
+    setappdata(hndl,'ysize',[]);
+    setappdata(hndl,'startbyte',[]);
+    setappdata(hndl,'xdata',[]);
+    setappdata(hndl,'ydata',[]);
+    setappdata(hndl,'attrib',[]);
+    setappdata(hndl,'attributes',[]);
+
+   
+	stop(getappdata(hndl,'atrfilesavetimer'));
+    
+    
 end
 
 
@@ -1276,45 +1396,13 @@ end
 function guiclosereqestfcn(src,evnt, hndl)
 % things to do when shutting down
 
-fclose all;   % close the open file
-
-% shut off the atr file autosave timer
-stop(getappdata(hndl,'atrfilesavetimer'));    
+% delete the timer
 delete(getappdata(hndl,'atrfilesavetimer'));
 
+fclose all;   % close any open files
 
-% prompt for saving attribute file
-ButtonName = questdlg('Save the *.atr file?', ...
-                         'Save Attributes to file', ...
-                         'Yes', 'No', 'Yes');
-switch ButtonName,
-	case 'Yes',
-        write_atr_file([],[],hndl);
-
-end % switch
-
-
-% prompt for saving attribute file
-ButtonName = questdlg('Edit next file?', ...
-                         'Next file?', ...
-                         'Yes', 'No', 'No');
-switch ButtonName,
-	case 'Yes',
-        load_currentsession('nextfile', hndl);
-        return;
-
-end % switch
-
-
-
-% if there's a options dialog open, close it
-% keyboard
-% if ~isempty(SETTINGS.h_optsdlg),
-% 
-%     close(SETTINGS.h_optsdlg);
-% 	SETTINGS.h_optsdlg = [];    % null the field before removing it
-% end;
-
+% if there is an open file, close it & timers
+closedatafile(src,evnt, hndl);
 
 
 % eliminate all app data
@@ -1323,6 +1411,8 @@ for i = 1:length(appdatanames),
     rmappdata(hndl,appdatanames{i});
 end;
 
+
+fprintf('Shutting down program\n');
 
 closereq;
 
@@ -1706,7 +1796,7 @@ function updateroiframes(hndl)
 currfocus = gcf;
 figure(hndl);   % to make sure focus is in main window, regardless of where called from
 
-%SETTINGS.titletxt = SETTINGS.roifilename;
+
 
 % need to get rid of the old buttons to paint the new ones
 h_im = getappdata(hndl,'h_im');
@@ -1818,7 +1908,7 @@ end;
 setappdata(hndl,'h_im',h_im);
 setappdata(hndl,'h_txt',h_txt);
 
-set(hndl,'name',[getappdata(hndl,'roifilename') sprintf('   page %d of %d', getappdata(hndl,'currpageindx'),getappdata(hndl,'lastpage'))] );
+set(hndl,'name',[fullfile(getappdata(hndl,'path'), getappdata(hndl,'file')) sprintf('   page %d of %d', getappdata(hndl,'currpageindx'),getappdata(hndl,'lastpage'))] );
 
 % go back to figure that had focus before the update
 figure(currfocus);
@@ -1888,16 +1978,18 @@ end;
 
 
 % first open the roi file for reading only
-setappdata(hndl,'roifilename', fullfile(getappdata(hndl,'path'), [froot '.roi']) );
-setappdata(hndl,'fid', fopen(getappdata(hndl,'roifilename'),'rb') );  % open the roi file to read the roi pixel data
+setappdata(hndl,'fid', fopen(fullfile(getappdata(hndl,'path'), [froot '.roi']),'rb') );  % open the roi file to read the roi pixel data
 
-fprintf('Opening IFCB file set for %s\n',getappdata(hndl,'roifilename') );
+fprintf('Opening IFCB file set for %s\n',fullfile(getappdata(hndl,'path'), [froot '.roi']) );
 
 % zero out any ADC data that may have existed before
-if (isappdata(hndl,'adcdata')),
-    rmappdata(hndl,{'adcdata','num_imgs','imgnum','xsize','ysize','trigger','startbyte','xdata','ydata'}); 
-end;
+tmp = getappdata(hndl,'adcdata');
+if (~isempty(tmp)),
+%    rmappdata(hndl,{'adcdata','num_imgs','imgnum','xsize','ysize','trigger','startbyte','xdata','ydata'}); 
 
+    errordlg(sprintf('Should not get to this point in importIFCBdata\n'), 'Input data error');
+end;
+clear tmp;
 
 % now load the ADC data using the right ADC file format
 setappdata(hndl,'adcdata', load(fullfile(getappdata(hndl,'path'), [froot '.adc']) ) );
@@ -1962,12 +2054,7 @@ else,   % no atr file found
 end;
 
 
-% start the autosave timer for the atr file
-start(getappdata(hndl,'atrfilesavetimer'));
 
-
-% Updating window look & feel
-set(getappdata(hndl,'h_main'),'name',getappdata(hndl,'roifilename') );
 
 % display all images, initially
 setappdata(hndl,'images_to_display', 1:getappdata(hndl,'num_imgs') ) ;
@@ -2165,7 +2252,7 @@ end
 function write_atr_file(src,evnt, hndl)
 % where the atr file is rewritten back out (overwritten)
 
-
+fprintf(sprintf('Saving data to *.atr file %s at %s\n',getappdata(hndl,'atrname'),datestr(now)) );
 h = msgbox(sprintf('Saving data to *.atr file\n%s',getappdata(hndl,'atrname')),'Saving data','modal');
 % open the atr file and read in all key-value pairs, & store in SETTINGS.attributes(i)
 fout = fopen(fullfile(getappdata(hndl,'atrpath'),getappdata(hndl,'atrname')),'wt');
@@ -2193,8 +2280,9 @@ end
 function atr_timer_update(src,evnt, hndl)
     
     stop(getappdata(hndl,'atrfilesavetimer'));
+    fprintf('ATR file autosave: ');
     write_atr_file([],[],hndl);
-    fprintf('ATR file autosave\n');
+
     % reset the timer
     start(getappdata(hndl,'atrfilesavetimer'));
 
