@@ -15,8 +15,10 @@ close all force;
 h_main = figure; 
 set(h_main,'visible','off');    % make it initially invisible
 
-setappdata(h_main,'selectallxfer',0); % a hack to help with the select all: shift-mouse won't work..
+setappdata(h_main,'version','7Dec2015');
 
+
+setappdata(h_main,'selectallxfer',0); % a hack to help with the select all: shift-mouse won't work..
 
 % these are for the autosave feature to save atr files every 5 min
 % an atrfile autosave timer is started whenver an atr file is opened or created
@@ -362,6 +364,7 @@ setappdata(hndl,'mhe',uimenu(gcf,'Label','Select All','Callback',{@image_select_
 
 setappdata(hndl,'mhf', uimenu(gcf,'Label','Debug','Callback',{@menu_debug, hndl}) );
 
+setappdata(hndl,'mhg', uimenu(gcf,'Label','Version','Callback',{@menu_version, hndl}) );
 
 end
 
@@ -388,6 +391,12 @@ function menu_debug(src,evnt,hndl)
 keyboard;
 end
 
+
+function menu_version(src,evnt,hndl)
+
+uiwait(msgbox(['Ver ' getappdata(hndl,'version')],'Version','modal'));
+
+end
 
 
 
@@ -1430,14 +1439,17 @@ end
 function guiclosereqestfcn(src,evnt, hndl)
 % things to do when shutting down
 
-% delete the timer
-delete(getappdata(hndl,'atrfilesavetimer'));
+fprintf('Shutting down program\n');
+
+%stop(getappdata(hndl,'atrfilesavetimer'));
 
 fclose all;   % close any open files
 
 % if there is an open file, close it & timers
 closedatafile(src,evnt, hndl);
 
+% delete the timer
+delete(getappdata(hndl,'atrfilesavetimer'));
 
 % eliminate all app data
 appdatanames = fieldnames(getappdata(hndl));
@@ -1446,7 +1458,8 @@ for i = 1:length(appdatanames),
 end;
 
 
-fprintf('Shutting down program\n');
+
+fprintf('Program shut down\n');
 
 closereq;
 
@@ -1943,7 +1956,10 @@ end;
 setappdata(hndl,'h_im',h_im);
 setappdata(hndl,'h_txt',h_txt);
 
-set(hndl,'name',[fullfile(getappdata(hndl,'path'), getappdata(hndl,'file')) sprintf('   page %d of %d', getappdata(hndl,'currpageindx'),getappdata(hndl,'lastpage'))] );
+if (isappdata(hndl,'file')),
+    set(hndl,'name',[fullfile(getappdata(hndl,'path'), getappdata(hndl,'file')) sprintf('   page %d of %d', getappdata(hndl,'currpageindx'),getappdata(hndl,'lastpage'))] );
+end;
+
 
 % go back to figure that had focus before the update
 figure(currfocus);
