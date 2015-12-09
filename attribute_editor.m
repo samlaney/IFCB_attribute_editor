@@ -15,7 +15,7 @@ close all force;
 h_main = figure; 
 set(h_main,'visible','off');    % make it initially invisible
 
-setappdata(h_main,'version','7Dec2015');
+setappdata(h_main,'version','9Dec2015');
 
 
 setappdata(h_main,'selectallxfer',0); % a hack to help with the select all: shift-mouse won't work..
@@ -316,18 +316,24 @@ function clearwindow(hndl)
 
 figure(hndl);   % to make sure focus is in main window, regardless of where called from
 
-% need to get rid of the old buttons to paint the new ones
+% need to get rid of the old images 
 h_im = getappdata(hndl,'h_im');
 h_txt = getappdata(hndl,'h_txt');
 len = length(h_im);
+
 if (len > 0),
     for i = len:-1:1,
+        % remove (deleted) the object from the screen then zero its entry
         delete(h_im(i));
         h_im(i) = [];
         delete(h_txt(i));
         h_txt(i) = [];
     end;
 end;
+
+% load this nothing back into appdata
+setappdata(hndl,'h_im',h_im);
+setappdata(hndl,'h_txt',h_txt);
 
 set(hndl,'name','No file selected');
 
@@ -1844,8 +1850,7 @@ currfocus = gcf;
 
 figure(hndl);   % to make sure focus is in main window, regardless of where called from
  
-h_im = getappdata(hndl,'h_im');
-h_txt = getappdata(hndl,'h_txt');
+
 % % need to get rid of the old buttons to paint the new ones
 % len = length(h_im);
 % if (len > 0),
@@ -1858,6 +1863,8 @@ h_txt = getappdata(hndl,'h_txt');
 % end;
 clearwindow(hndl);
 
+%h_im = getappdata(hndl,'h_im');
+%h_txt = getappdata(hndl,'h_txt');
 
 
 % find all the rois on the page to display
@@ -1953,8 +1960,10 @@ for j = 1:length(rois_in_frame);    % the number of images to be painted in the 
 
 end;
 
-setappdata(hndl,'h_im',h_im);
-setappdata(hndl,'h_txt',h_txt);
+if (length(rois_in_frame) > 0),
+    setappdata(hndl,'h_im',h_im);
+    setappdata(hndl,'h_txt',h_txt);
+end;
 
 if (isappdata(hndl,'file')),
     set(hndl,'name',[fullfile(getappdata(hndl,'path'), getappdata(hndl,'file')) sprintf('   page %d of %d', getappdata(hndl,'currpageindx'),getappdata(hndl,'lastpage'))] );
